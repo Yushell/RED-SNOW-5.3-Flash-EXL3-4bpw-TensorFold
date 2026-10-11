@@ -6,6 +6,18 @@ RED-SNOW-5.3-Flash is a cybersecurity (red-team / adversary-emulation) family va
 
 **The pack itself is not hosted here** (164 GiB). This repo is the build record, the conversion recipe, and the serving kit to reproduce it.
 
+## Credits and attributions
+
+Credit where it is due, all links:
+
+- **The model**: [Blackfrost-AI](https://huggingface.co/Blackfrost-AI) publishes [RED-SNOW-5.3-Flash](https://huggingface.co/Blackfrost-AI/RED-SNOW-5.3-FLASH-BF16), a red-team adaptation of [Z.ai](https://huggingface.co/zai-org)'s GLM-5.3-Flash.
+- **The serving engine**: [TensorFold](https://github.com/ashhart/TensorFold) by [Ash Hart (ashhart)](https://github.com/ashhart) and the TensorFold contributors (the two-rank CUDA GLM path, EXL3 expert kernels, DFlash2 and MTP drafting, the OpenAI-compatible server).
+- **The EXL3 format and converter**: [exllamav3](https://github.com/turboderp-org/exllamav3) by [turboderp](https://github.com/turboderp-org) (MIT); this pack's conversion ran the checkpointed fork by [vcruz305](https://github.com/vcruz305/exllamav3), commit `764b4ad`.
+- **The recipe this kit plugs into**: [Mia's AI Lab](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold) supplies the serving recipe, the local-cache pattern, and the [chat-template revision](https://huggingface.co/Mia-AiLab/GLM-5.3-Flash-EXL3-4bpw-TensorFold) this kit ships ([Mia-AiLab on HF](https://huggingface.co/Mia-AiLab)).
+- **The drafter**: [incoai](https://huggingface.co/incoai)'s [GLM-5.3-Flash-DFlash2](https://huggingface.co/incoai/GLM-5.3-Flash-DFlash2) (CC BY-NC-ND 4.0) supplies the speculative drafts.
+
+The deeper stack keeps its own credits (the b12x RoCE transport, z-lab's DFlash architecture, Hugging Face transformers' modeling code, and more): see the recipe's [CREDITS.md](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold/blob/main/CREDITS.md) and TensorFold's [third-party notices](https://github.com/ashhart/TensorFold/blob/v0.6.0/THIRD_PARTY_NOTICES.md). The full list is at the end of this README.
+
 ## Results at a glance
 
 | Metric | Result |
@@ -96,10 +108,23 @@ Toolchain: exllamav3 `convert.py` (fork `vcruz305/exllamav3` @ `764b4ad`, built 
 - **Thinking and reply sizes:** the model thinks by default. Give long-form requests 2400+ `max_tokens` (thinking runs ~1.7k tokens on open tasks), and per-request `"chat_template_kwargs": {"enable_thinking": false}` works when you want a direct answer.
 - **Draft speed:** the DFlash2 drafter is a base-model checkpoint, so on these adapted weights its acceptance is a little lower than on GLM. Expect the ~15% aggregate gap vs the same-pair GLM lane shown above.
 - **Disk:** pack ~164 GiB (head) + the BF16 source if you keep it (~643 GB) + ~1 copy of scratch during conversion.
-- **Not affiliated** with Blackfrost-AI, MiaAI-Lab, or the TensorFold authors; this is an independent community build. Licenses to respect: model weights MIT (Blackfrost-AI), TensorFold Apache-2.0, exllamav3 MIT, DFlash2 CC BY-NC-ND 4.0 (non-commercial). This repo's own content is Apache-2.0.
+- **Not affiliated** with any upstream authors; see Credits for the full attribution list and licenses.
 
 ## Credits
 
-- RED-SNOW-5.3-Flash weights: Blackfrost-AI.
-- TensorFold serving stack and the GLM recipe structure this kit plugs into: ashhart / MiaAI-Lab.
-- Chat template revision: Z.ai (via the Mia-AiLab pack).
+Every piece this work builds on, with links:
+
+- **RED-SNOW-5.3-Flash** (weights, design, training): [Blackfrost-AI](https://huggingface.co/Blackfrost-AI) ([model page](https://huggingface.co/Blackfrost-AI/RED-SNOW-5.3-FLASH-BF16), MIT).
+- **GLM-5.3-Flash** (base model, design, training, the chat-template lineage): [Z.ai / zai-org](https://huggingface.co/zai-org) ([base model](https://huggingface.co/zai-org/GLM-5.3-Flash-BF16)).
+- **TensorFold** (the serving engine): [Ash Hart](https://github.com/ashhart) and the TensorFold contributors, [ashhart/TensorFold](https://github.com/ashhart/TensorFold) (Apache-2.0 since v0.6.0; MIT before).
+- **exllamav3** (the EXL3 format and `convert.py`, MIT): [turboderp-org/exllamav3](https://github.com/turboderp-org/exllamav3) by [turboderp](https://github.com/turboderp-org); the pinned fork this build used: [vcruz305/exllamav3](https://github.com/vcruz305/exllamav3), commit `764b4ad`.
+- **The 2x DGX Spark TensorFold recipe** (Apache-2.0): [MiaAI-Lab recipe repo](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold); [Mia-AiLab on Hugging Face](https://huggingface.co/Mia-AiLab). Its [CREDITS.md](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold/blob/main/CREDITS.md) and [NOTICE](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold/blob/main/NOTICE) carry the stack's own third-party attributions.
+- **The chat template** (the vision-critical revision in `serving/`): [Z.ai](https://huggingface.co/zai-org), via the [Mia-AiLab GLM pack](https://huggingface.co/Mia-AiLab/GLM-5.3-Flash-EXL3-4bpw-TensorFold).
+- **The DFlash2 drafter** (CC BY-NC-ND 4.0, non-commercial): [incoai/GLM-5.3-Flash-DFlash2](https://huggingface.co/incoai/GLM-5.3-Flash-DFlash2) by [incoai](https://huggingface.co/incoai).
+- **The DFlash architecture** (MIT): [z-lab/dflash](https://github.com/z-lab/dflash) by [Z Lab](https://github.com/z-lab), which TensorFold's drafter ports.
+- **GLM-5.3-Flash modeling code** (Apache-2.0): [Hugging Face transformers](https://github.com/huggingface/transformers), the reference TensorFold follows.
+- **The RoCE all-gather transport** (used by the recipe's patches): [b12x](https://github.com/local-inference-lab/b12x) by [local-inference-lab](https://github.com/local-inference-lab) (Apache-2.0).
+- **safetensors** (used by `scripts/split_fused.py`, Apache-2.0): [safetensors/safetensors](https://github.com/safetensors/safetensors).
+- **Hardware and container platform**: [NVIDIA DGX Spark](https://www.nvidia.com/en-us/products/workstations/dgx-spark/) (GB10) and the NVIDIA PyTorch NGC container the recipe builds on.
+
+This is an independent community build, not affiliated with any of the organizations above. Licenses to respect when reusing: model weights MIT (Blackfrost-AI); TensorFold and its recipe Apache-2.0; exllamav3 MIT; DFlash2 CC BY-NC-ND 4.0 (non-commercial, no derivatives); this repo's own content Apache-2.0.
