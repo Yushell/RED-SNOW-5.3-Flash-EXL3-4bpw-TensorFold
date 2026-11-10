@@ -6,9 +6,6 @@ RED-SNOW-5.3-Flash is a cybersecurity (red-team / adversary-emulation) family va
 
 **The pack itself is not hosted here** (164 GiB). This repo is the build record, the conversion recipe, and the serving kit to reproduce it.
 
-> [!info] State 2026-11-10: live again on the current stack
-> The lane was restored from the Olares archive and rebuilt on the **125-patch** TensorFold image (label `9be02706cb1e`) with the recipe's lab opt-ins: **KV sharding on** (`TF_GLM_KV_SHARD=1`), the **spill tier** (64 GiB per rank), the **effort-tail cache** and `expandable_segments`. It serves `RED-SNOW-5.3-Flash-EXL3` on `:8888` at **1,048,576** context, 4 streams, pool **4,661,248 tokens**, loaded in 141.9 s. Re-measured the same day: house bench 114.5 / 56.2 / 96.9 t/s, llmapi c1/2/4 **47.3 / 83.9 / 154.3** Gen TPS, a 221,885-token needle exact in 130.5 s. The v1.8-v1.9 numbers further down are kept as the original build record.
-
 ## Credits and attributions
 
 Credit where it is due, all links:
@@ -23,14 +20,14 @@ The deeper stack keeps its own credits (the b12x RoCE transport, z-lab's DFlash 
 
 ## Results at a glance
 
-These are the **original v1.0.0 build** numbers. The current, re-measured build is in the state block above and in [The 2026-11-10 rebuild](#the-2026-11-10-rebuild-what-changed-what-it-measured).
+These are the **v1.0.0 build** numbers. The same pack on the newer engine stack is measured in [Serving configuration (2026-11-10 build)](#serving-configuration-2026-11-10-build).
 
 | Metric | Result |
 |---|---|
 | Single-stream decode | 43-54 tok/s (MTP drafts); up to 72 tok/s on prose/code with DFlash2 |
 | Aggregate decode (DFlash2) | 63.5 tok/s at 2 streams · **87.4 tok/s at 4 streams** |
 | Same-pair GLM-5.3-Flash reference | 103.2 tok/s prose at 4 streams (same class; this pack drafts with the base-model DFlash2 on adapted weights) |
-| Load time | ~2.2-2.3 min to live |
+| Load time | ~2.2-2.3 min to ready |
 | Context window | 1,048,576 tokens (fp8 KV) |
 | Long-context recall | pass at 48K, 241K, and **full-window 1,035,952 tokens** (buried passphrase at 50% depth, found exactly) |
 | Vision | pass (1.05 GiB tower; image probe answered correctly) |
@@ -107,9 +104,9 @@ Toolchain: exllamav3 `convert.py` (fork `vcruz305/exllamav3` @ `764b4ad`, built 
 
    Expect 37,161 EXL3 tensors, all mcg, "every EXL3 tensor is readable", 0 parse issues.
 
-## The 2026-11-10 rebuild: what changed, what it measured
+## Serving configuration (2026-11-10 build)
 
-The pack was restored from the Olares archive and served through the GLM recipe's current **125-patch** image (label `9be02706cb1e`, TensorFold 0.6.0). Four settings the original build did not have:
+The pack serves through the GLM recipe's **125-patch** image (label `9be02706cb1e`, TensorFold 0.6.0). Compared with the v1.0.0 build, four settings are new:
 
 - **KV sharding** (`TF_GLM_KV_SHARD=1`, patch `0129`): each conversation's MLA latent is stored once, on the Spark that owns it, instead of on both. Pool at 4 streams x 1M context: **4,661,248 tokens** in the same memory.
 - **Spill tier** (`SPILL_GIB=64`): kept prompt states persist on each Spark's disk across restarts.
@@ -119,7 +116,7 @@ The pack was restored from the Olares archive and served through the GLM recipe'
 **Build the image locally, do not pull it.** The published image (`v0.6.0-789e8f3bdfa2`, 123 patches) predates `0129`, `0130` and `0132`; `PULL=0` forces the local build that bakes them in:
 
 ```bash
-cd <GLM recipe checkout>   # the kit with the lab patches (0129, 0130, 0132)
+cd <GLM recipe checkout>   # the kit carrying patches 0129, 0130, 0132
 MODEL_ID=local/RED-SNOW-5.3-Flash-EXL3-4bpw-TensorFold \
 MODEL_REVISION=6ce340744b1ab57a5d1d520b86714d21b7d17904 \
 WORKER_WEIGHTS=nfs SERVED_NAME=RED-SNOW-5.3-Flash-EXL3 HF_HUB_OFFLINE=1 \

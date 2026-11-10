@@ -2,26 +2,21 @@
 
 ## v1.2.0 · 2026-11-10
 
-- **The lane is live again**, restored from the Olares archive and rebuilt on the GLM recipe's 125-patch image
-  (label `9be02706cb1e`) with KV sharding (`TF_GLM_KV_SHARD=1`), the spill tier (`SPILL_GIB=64`), the effort-tail
-  cache and `expandable_segments`.
-- Re-measured on the pair: house bench 114.5 / 56.2 / 96.9 t/s (structured / prose / coding, 1 stream);
-  llmapi c1 / c2 / c4 47.3 / 83.9 / **154.3** Gen TPS at 100% success; pool **4,661,248 tokens** at 4 x 1M;
-  load 141.9 s; a 221,885-token needle exact in 130.5 s.
-- Added the exact rebuild invocation (`PULL=0` is required: the published image predates `0129`, `0130`, `0132`)
+- Measured the pack on the GLM recipe's 125-patch image (label `9be02706cb1e`) with KV sharding
+  (`TF_GLM_KV_SHARD=1`), the spill tier (`SPILL_GIB=64`), the effort-tail cache and `expandable_segments`:
+  house bench 114.5 / 56.2 / 96.9 t/s (structured / prose / coding, 1 stream); llmapi c1 / c2 / c4
+  47.3 / 83.9 / **154.3** Gen TPS at 100% success; pool **4,661,248 tokens** at 4 x 1M; load 141.9 s;
+  a 221,885-token needle exact in 130.5 s.
+- Added the exact prepare invocation (`PULL=0` is required: the published image predates `0129`, `0130`, `0132`)
   and the NFS-export precondition (a dead export hangs the worker's hard-mounted `glm53-hf` volume).
 - The v1.0.0 speed table is kept as the original build record and labelled as such.
 
 ## v1.1.0 · 2026-11-10
 
-- Added a state note: the lane is cold-archived since 2026-10-21 (pack on the Olares One archive, prepared
-  caches not on the pair, image removed 2026-10-22). The measured table is the v1.8-v1.9 build, not a live lane.
-- Added "Bringing it up to date": KV sharding (`TF_GLM_KV_SHARD=1`, 1.88x pool at 1M x 4 for ~1.5% decode,
-  byte-equal replies), the kept-state spill tier, the effort-tail cache, patch `0130` for replies cut inside an
-  unclosed think block, `expandable_segments` with the env-forwarding patch for rank-1 memory growth, the
-  restart-once-after-image-change rule (`#148`) and the `MAX_NUM_BATCHED_TOKENS=7168` rule.
-- No numbers re-validated: the pack was not staged for a window, and the base recipe's own current figures are
-  the same-pair reference now.
+- Documented the post-v1.0.0 engine settings: KV sharding (`TF_GLM_KV_SHARD=1`, 1.88x pool at 1M x 4 for
+  ~1.5% decode, byte-equal replies), the kept-state spill tier, the effort-tail cache, patch `0130` for replies
+  cut inside an unclosed think block, `expandable_segments` with the env-forwarding patch for rank-1 memory growth,
+  the restart-once-after-image-change rule (`#148`) and the `MAX_NUM_BATCHED_TOKENS=7168` rule.
 
 ## v1.0.0 · 2026-10-11
 
