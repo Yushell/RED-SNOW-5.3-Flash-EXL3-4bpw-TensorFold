@@ -6,6 +6,9 @@ RED-SNOW-5.3-Flash is a cybersecurity (red-team / adversary-emulation) family va
 
 **The pack itself is not hosted here** (164 GiB). This repo is the build record, the conversion recipe, and the serving kit to reproduce it.
 
+> [!info] State 2026-11-10: cold-archived
+> The lane is not running. The pack (169 GB) lives on the Olares One archive; its prepared caches are not on the 2x GB10 pair and its image was removed on 2026-10-22. This repo is the build record and the serving kit, not a live lane. The numbers below were measured against the v1.8-v1.9 era of the MiaAI recipe; that recipe has moved on, and the settings worth taking from it are in [Bringing it up to date](#bringing-it-up-to-date-2026-11-10).
+
 ## Credits and attributions
 
 Credit where it is due, all links:
@@ -101,6 +104,20 @@ Toolchain: exllamav3 `convert.py` (fork `vcruz305/exllamav3` @ `764b4ad`, built 
    ```
 
    Expect 37,161 EXL3 tensors, all mcg, "every EXL3 tensor is readable", 0 parse issues.
+
+## Bringing it up to date (2026-11-10)
+
+The kit plugs into MiaAI's GLM recipe, which is a moving target: the repo now ships a 96+ patch image pinned by digest in `scripts/config.sh` (`IMAGE_TAG` / `IMAGE_DIGEST`), where this pack was built and measured against the v1.8-v1.9 line. Nothing here is broken by that, but five things found since are worth taking if the lane is revived:
+
+- **KV sharding, the big one for a 1M lane.** `TF_GLM_KV_SHARD=1` (patch `0129`, needs `PARALLEL` > 1) stores each conversation's MLA latent once instead of on both Sparks. On this pair: **1.88x the pool in the same memory** (4,685,824 vs 2,494,464 tokens at TP2, 1M x 4) for about 1.5% decode (114.3 / 57.1 / 97.8 to 112.4 / 56.1 / 96.5 t/s), greedy replies byte-identical.
+- **Kept-state spill tier.** `SPILL_GIB=64` flushes kept prompt states to disk on a clean stop; a 200k chat resumed in 0.12 s after a restart (restore p50 ~0.26 s).
+- **Effort-tail cache.** `TF_GLM_EFFORT_TAIL=1` makes effort/thinking switches 99.8% cached instead of 0%.
+- **`0130`, for empty answers.** A reply cut inside an unclosed think block comes back as text with `unclosed_think: 1` instead of an empty `content`.
+- **Rank-1 memory growth over days (#143).** `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` plus the recipe's one-line env-forwarding patch; the variable alone never reaches a rank.
+
+Two operational notes for a revival: after any image change, start once and restart again before trusting the KV pool (the first start sizes it small, issue `#148`), and keep `MAX_NUM_BATCHED_TOKENS=7168` (2x the page size) or chunks below the page size make KDA checkpoint reuse accidental.
+
+If the lane runs on the newer image, re-measure before quoting the table above: these numbers are the v1.8-v1.9 build, and the recipe's own current figures are the same-pair reference now.
 
 ## Notes and gotchas
 
