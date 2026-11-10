@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.0 · 2026-11-10
+
+- **The lane is live again**, restored from the Olares archive and rebuilt on the GLM recipe's 125-patch image
+  (label `9be02706cb1e`) with KV sharding (`TF_GLM_KV_SHARD=1`), the spill tier (`SPILL_GIB=64`), the effort-tail
+  cache and `expandable_segments`.
+- Re-measured on the pair: house bench 114.5 / 56.2 / 96.9 t/s (structured / prose / coding, 1 stream);
+  llmapi c1 / c2 / c4 47.3 / 83.9 / **154.3** Gen TPS at 100% success; pool **4,661,248 tokens** at 4 x 1M;
+  load 141.9 s; a 221,885-token needle exact in 130.5 s.
+- Added the exact rebuild invocation (`PULL=0` is required: the published image predates `0129`, `0130`, `0132`)
+  and the NFS-export precondition (a dead export hangs the worker's hard-mounted `glm53-hf` volume).
+- The v1.0.0 speed table is kept as the original build record and labelled as such.
+
 ## v1.1.0 · 2026-11-10
 
 - Added a state note: the lane is cold-archived since 2026-10-21 (pack on the Olares One archive, prepared

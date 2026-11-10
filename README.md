@@ -6,8 +6,8 @@ RED-SNOW-5.3-Flash is a cybersecurity (red-team / adversary-emulation) family va
 
 **The pack itself is not hosted here** (164 GiB). This repo is the build record, the conversion recipe, and the serving kit to reproduce it.
 
-> [!info] State 2026-11-10: cold-archived
-> The lane is not running. The pack (169 GB) lives on the Olares One archive; its prepared caches are not on the 2x GB10 pair and its image was removed on 2026-10-22. This repo is the build record and the serving kit, not a live lane. The numbers below were measured against the v1.8-v1.9 era of the MiaAI recipe; that recipe has moved on, and the settings worth taking from it are in [Bringing it up to date](#bringing-it-up-to-date-2026-11-10).
+> [!info] State 2026-11-10: live again on the current stack
+> The lane was restored from the Olares archive and rebuilt on the **125-patch** TensorFold image (label `9be02706cb1e`) with the recipe's lab opt-ins: **KV sharding on** (`TF_GLM_KV_SHARD=1`), the **spill tier** (64 GiB per rank), the **effort-tail cache** and `expandable_segments`. It serves `RED-SNOW-5.3-Flash-EXL3` on `:8888` at **1,048,576** context, 4 streams, pool **4,661,248 tokens**, loaded in 141.9 s. Re-measured the same day: house bench 114.5 / 56.2 / 96.9 t/s, llmapi c1/2/4 **47.3 / 83.9 / 154.3** Gen TPS, a 221,885-token needle exact in 130.5 s. The v1.8-v1.9 numbers further down are kept as the original build record.
 
 ## Credits and attributions
 
@@ -22,6 +22,8 @@ Credit where it is due, all links:
 The deeper stack keeps its own credits (the b12x RoCE transport, z-lab's DFlash architecture, Hugging Face transformers' modeling code, and more): see the recipe's [CREDITS.md](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold/blob/main/CREDITS.md) and TensorFold's [third-party notices](https://github.com/ashhart/TensorFold/blob/v0.6.0/THIRD_PARTY_NOTICES.md). The full list is at the end of this README.
 
 ## Results at a glance
+
+These are the **original v1.0.0 build** numbers. The current, re-measured build is in the state block above and in [The 2026-11-10 rebuild](#the-2026-11-10-rebuild-what-changed-what-it-measured).
 
 | Metric | Result |
 |---|---|
@@ -105,19 +107,37 @@ Toolchain: exllamav3 `convert.py` (fork `vcruz305/exllamav3` @ `764b4ad`, built 
 
    Expect 37,161 EXL3 tensors, all mcg, "every EXL3 tensor is readable", 0 parse issues.
 
-## Bringing it up to date (2026-11-10)
+## The 2026-11-10 rebuild: what changed, what it measured
 
-The kit plugs into MiaAI's GLM recipe, which is a moving target: the repo now ships a 96+ patch image pinned by digest in `scripts/config.sh` (`IMAGE_TAG` / `IMAGE_DIGEST`), where this pack was built and measured against the v1.8-v1.9 line. Nothing here is broken by that, but five things found since are worth taking if the lane is revived:
+The pack was restored from the Olares archive and served through the GLM recipe's current **125-patch** image (label `9be02706cb1e`, TensorFold 0.6.0). Four settings the original build did not have:
 
-- **KV sharding, the big one for a 1M lane.** `TF_GLM_KV_SHARD=1` (patch `0129`, needs `PARALLEL` > 1) stores each conversation's MLA latent once instead of on both Sparks. On this pair: **1.88x the pool in the same memory** (4,685,824 vs 2,494,464 tokens at TP2, 1M x 4) for about 1.5% decode (114.3 / 57.1 / 97.8 to 112.4 / 56.1 / 96.5 t/s), greedy replies byte-identical.
-- **Kept-state spill tier.** `SPILL_GIB=64` flushes kept prompt states to disk on a clean stop; a 200k chat resumed in 0.12 s after a restart (restore p50 ~0.26 s).
-- **Effort-tail cache.** `TF_GLM_EFFORT_TAIL=1` makes effort/thinking switches 99.8% cached instead of 0%.
-- **`0130`, for empty answers.** A reply cut inside an unclosed think block comes back as text with `unclosed_think: 1` instead of an empty `content`.
-- **Rank-1 memory growth over days (#143).** `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` plus the recipe's one-line env-forwarding patch; the variable alone never reaches a rank.
+- **KV sharding** (`TF_GLM_KV_SHARD=1`, patch `0129`): each conversation's MLA latent is stored once, on the Spark that owns it, instead of on both. Pool at 4 streams x 1M context: **4,661,248 tokens** in the same memory.
+- **Spill tier** (`SPILL_GIB=64`): kept prompt states persist on each Spark's disk across restarts.
+- **Effort-tail cache** (`TF_GLM_EFFORT_TAIL=1`): thinking/effort switches keep the prompt cached instead of re-prefilling it.
+- **`expandable_segments`** (with the recipe's env-forwarding one-liner): rank-1 memory stays flat over days.
 
-Two operational notes for a revival: after any image change, start once and restart again before trusting the KV pool (the first start sizes it small, issue `#148`), and keep `MAX_NUM_BATCHED_TOKENS=7168` (2x the page size) or chunks below the page size make KDA checkpoint reuse accidental.
+**Build the image locally, do not pull it.** The published image (`v0.6.0-789e8f3bdfa2`, 123 patches) predates `0129`, `0130` and `0132`; `PULL=0` forces the local build that bakes them in:
 
-If the lane runs on the newer image, re-measure before quoting the table above: these numbers are the v1.8-v1.9 build, and the recipe's own current figures are the same-pair reference now.
+```bash
+cd <GLM recipe checkout>   # the kit with the lab patches (0129, 0130, 0132)
+MODEL_ID=local/RED-SNOW-5.3-Flash-EXL3-4bpw-TensorFold \
+MODEL_REVISION=6ce340744b1ab57a5d1d520b86714d21b7d17904 \
+WORKER_WEIGHTS=nfs SERVED_NAME=RED-SNOW-5.3-Flash-EXL3 HF_HUB_OFFLINE=1 \
+PULL=0 ./scripts/prepare.sh
+./start.sh
+```
+
+The host's NFS export must be up before `prepare.sh` runs: with `WORKER_WEIGHTS=nfs`, the worker's `glm53-hf` volume is a **hard** NFS mount, and a dead export leaves the preflight hung on a `docker run -v glm53-hf:/hf` forever. `sudo systemctl start nfs-server && sudo exportfs -ra` on the head, then re-run prepare (it is idempotent).
+
+| Metric | Original build (v1.0.0) | 2026-11-10 rebuild |
+|---|---|---|
+| Single stream, prose / coding | 43-54 tok/s / up to 72 | **56.2 / 96.9 tok/s** (house bench also: structured 114.5) |
+| Aggregate, 2 / 4 streams | 63.5 / 87.4 tok/s | **83.9 / 154.3 t/s** (llmapibenchmark, 512 tokens, 100% success) |
+| Pool at 4 streams x 1M ctx | replicated KV cache | **4,661,248 tokens** (KV-sharded) |
+| Load | ~2.2-2.3 min | 141.9 s |
+| Long context | full-window 1M needle passed | 221,885-token needle exact in 130.5 s (full 1M not re-run) |
+
+The single-stream deltas are in the same class as the original build (prose is 2-12 t/s higher, coding higher still on the newer kernel set); the large numbers are the aggregate and the pool, which is what the shard and the newer verify windows buy.
 
 ## Notes and gotchas
 
